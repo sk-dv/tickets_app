@@ -1,0 +1,45 @@
+name: tickets_app
+description: "A new Flutter project."
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.1.0
+  flutter_feather_icons: ^2.0.0
+  riverpod: ^2.4.0
+  flutter_riverpod: ^2.4.0
+  supabase_flutter: ^2.0.0
+  image_picker: ^1.0.0
+  equatable: ^2.0.7
+  google_generative_ai: ^0.4.0
+  http: ^1.1.0
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.0
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+  fonts:
+    - family: SF Pro
+      fonts:
+        - asset: assets/fonts/SF-Pro-Text-Regular.otf
+        - asset: assets/fonts/SF-Pro-Text-Medium.otf
+          weight: 500
+        - asset: assets/fonts/SF-Pro-Text-Semibold.otf
+          weight: 600
+    - family: SF Mono
+      fonts:
+        - asset: assets/fonts/SF-Mono-Regular.otf
+        - asset: assets/fonts/SF-Mono-Medium.otf
+          weight: 500
