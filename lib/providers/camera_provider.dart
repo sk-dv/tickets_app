@@ -66,14 +66,9 @@ class CameraNotifier extends StateNotifier<CameraStateData> {
 
   Future<void> _analyzePhoto(String imagePath) async {
     try {
-      print('⏳ Analizando con Gemini...');
       final geminiData = await _geminiService.analyzeTicket(imagePath);
-
-      print('✓ Gemini respondió: ${geminiData.comercio}');
       state = state.copyWith(geminiData: geminiData, state: CameraState.done);
-      print('✓ Estado: done');
     } catch (e) {
-      print('✗ Error Gemini: $e');
       state = state.copyWith(
         state: CameraState.error,
         error: 'Error al analizar ticket: $e',
