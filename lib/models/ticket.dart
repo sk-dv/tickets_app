@@ -1,14 +1,19 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
+import 'package:tickets_app/models/category.dart';
 
-class Product extends Equatable {
-  final String nombre;
-  final int cantidad;
-  final double precio;
+part 'ticket.g.dart';
 
-  const Product({
-    required this.nombre,
-    required this.cantidad,
-    required this.precio,
+@embedded
+class Product {
+  late String nombre;
+  late int cantidad;
+  late double precio;
+
+  Product({
+    this.nombre = '',
+    this.cantidad = 0,
+    this.precio = 0.0,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -19,35 +24,67 @@ class Product extends Equatable {
     );
   }
 
-  @override
-  List<Object> get props => [nombre, cantidad, precio];
+  Map<String, dynamic> toJson() => {
+        'nombre': nombre,
+        'cantidad': cantidad,
+        'precio': precio,
+      };
 }
 
-class Ticket extends Equatable {
-  final String id;
-  final String comercio;
-  final DateTime fecha;
-  final double total;
-  final String categoria;
-  final List<Product> products;
+@collection
+class Ticket {
+  Id id = Isar.autoIncrement;
 
-  const Ticket({
-    required this.id,
+  @Index()
+  late String comercio;
+
+  @Index()
+  late DateTime fecha;
+
+  late double total;
+
+  @Index()
+  late String categoria;
+
+  String? direccion;
+  double? tiempoExtraccion;
+  DateTime? fechaProcesamiento;
+  bool handmade;
+
+  List<Product> productos;
+
+  Ticket({
+    this.id = Isar.autoIncrement,
     required this.comercio,
     required this.fecha,
     required this.total,
     required this.categoria,
-    this.products = const [],
+    this.productos = const [],
+    this.direccion,
+    this.tiempoExtraccion,
+    this.fechaProcesamiento,
+    this.handmade = false,
   });
-  
+
+  @ignore
+  IconData get icon {
+    final category = Categories.all.cast<Category>().firstWhere(
+      (c) => c.nombre.toLowerCase() == categoria.toLowerCase(),
+      orElse: () => Categories.all.last,
+    );
+    return category.icono;
+  }
+
+  @ignore
+  List<Product> get products => productos;
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
     final items = json['productos'] as List<dynamic>? ?? [];
 
-    // Manejar fecha/hora NULLs
     DateTime parsedFecha;
     try {
-      final fecha = json['fecha'] ?? DateTime.now().toIso8601String().split('T')[0];
+      final fecha =
+          json['fecha'] ?? DateTime.now().toIso8601String().split('T')[0];
       final hora = json['hora'] ?? '00:00:00';
       parsedFecha = DateTime.parse('${fecha}T$hora');
     } catch (_) {
@@ -55,15 +92,28 @@ class Ticket extends Equatable {
     }
 
     return Ticket(
-      id: json['id'].toString(),
       comercio: json['comercio'] ?? '',
       fecha: parsedFecha,
       total: (json['total'] as num?)?.toDouble() ?? 0.0,
-      categoria: json['categoría'] ?? '',
-      products: items.map((item) => Product.fromJson(item)).toList(),
+      categoria: json['categoría'] ?? json['categoria'] ?? '',
+      productos: items.map((item) => Product.fromJson(item)).toList(),
+      direccion: json['direccion'],
+      tiempoExtraccion: (json['tiempo_extraccion'] as num?)?.toDouble(),
+      fechaProcesamiento: json['fecha_procesamiento'] != null
+          ? DateTime.parse(json['fecha_procesamiento'])
+          : null,
+      handmade: json['handmade'] ?? false,
     );
   }
 
-  @override
-  List<Object> get props => [id, comercio, fecha, total, categoria, products];
+  factory Ticket.empty() {
+    return Ticket(
+      comercio: '',
+      fecha: DateTime.now(),
+      total: 0.0,
+      categoria: '',
+      productos: [],
+      handmade: false,
+    );
+  }
 }

@@ -7,15 +7,19 @@ import 'package:tickets_app/models/ticket.dart';
 import 'package:tickets_app/providers/camera_provider.dart';
 import 'package:tickets_app/providers/form_provider.dart';
 import 'package:tickets_app/providers/ticket_provider.dart';
-import 'package:tickets_app/utils/confidence_calculator.dart';
 import 'package:tickets_app/widgets/app_button.dart';
 import 'package:tickets_app/widgets/confirmation_view.dart';
 import 'package:tickets_app/widgets/form_field.dart';
 
 class TicketFormModal extends ConsumerWidget {
-  const TicketFormModal({super.key, required this.ticket});
-
+  final bool isManual;
   final Ticket ticket;
+
+  const TicketFormModal({
+    super.key,
+    required this.ticket,
+    this.isManual = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,7 +90,7 @@ class _EditingViewState extends ConsumerState<EditingView> {
         ref.read(formProvider.notifier).setGeminiData(cameraState.geminiData!);
       }
       // Prioridad 2: Cargar datos del ticket existente
-      else if (widget.ticket.id.isNotEmpty) {
+      else if (widget.ticket.id != 0) {
         _loadTicketData(widget.ticket);
       }
     });
@@ -258,14 +262,12 @@ class _EditingViewState extends ConsumerState<EditingView> {
 
               ref.read(formProvider.notifier).setUserCorrections(corrections);
 
-              // Guardar en Supabase
+              // Guardar en Isar
               try {
                 final cameraState = ref.read(cameraProvider);
 
                 // Guardar ticket
-                final ticketId = await ref
-                    .read(ticketsProvider.notifier)
-                    .saveTicket(
+                await ref.read(ticketsProvider.notifier).saveTicket(
                       comercio: comercioController.text,
                       fecha: fechaController.text.isEmpty
                           ? DateTime.now().toIso8601String().split('T')[0]
@@ -276,34 +278,6 @@ class _EditingViewState extends ConsumerState<EditingView> {
                       categoria: categoriaController.text,
                       handmade: cameraState.geminiData == null,
                     );
-
-                // Guardar en training_data si hubo extracción de Gemini
-                if (cameraState.geminiData != null &&
-                    cameraState.fotoPath != null) {
-                  final confianza = ConfidenceCalculator.calculate(
-                    gemini: cameraState.geminiData!,
-                    usuario: corrections,
-                  );
-
-                  final geminiJson = cameraState.geminiData!.toJson();
-                  if (cameraState.geminiData!.tiempoExtraccion != null) {
-                    geminiJson['tiempo_extraccion'] =
-                        cameraState.geminiData!.tiempoExtraccion;
-                  }
-
-                  await ref
-                      .read(ticketsProvider.notifier)
-                      .saveTrainingData(
-                        comercio: comercioController.text,
-                        fotoPath: cameraState.fotoPath!,
-                        geminiOriginal: geminiJson,
-                        usuarioCorreccion: corrections.toJson(),
-                        categoriaFinal: categoriaController.text,
-                        handmade: false,
-                        confianzaGemini: confianza,
-                        ticketId: ticketId,
-                      );
-                }
 
                 // Si llegamos aquí, el guardado fue exitoso
                 ref.read(formProvider.notifier).moveToConfirming();

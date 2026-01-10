@@ -8,6 +8,7 @@ import 'package:tickets_app/providers/ticket_provider.dart';
 import 'package:tickets_app/screens/ticket_detail_screen.dart';
 import 'package:tickets_app/screens/ticket_form_modal.dart';
 import 'package:tickets_app/widgets/ticket_card.dart';
+import 'package:tickets_app/widgets/ticket_source_sheet.dart';
 
 extension ScreenSizeExtension on BuildContext {
   double get screenWidth => MediaQuery.of(this).size.width;
@@ -161,61 +162,60 @@ class HomeScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _handleCameraAction(context, ref),
+        onPressed: () => _handleAddTicket(context, ref),
         backgroundColor: AppColors.buttonPrimary,
         child: const Icon(FeatherIcons.camera, color: AppColors.white),
       ),
     );
   }
 
-  void _handleCameraAction(BuildContext ctx, WidgetRef ref) async {
+  void _handleAddTicket(BuildContext ctx, WidgetRef ref) async {
+    final source = await showModalBottomSheet<TicketSource>(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const TicketSourceSheet(),
+    );
+
+    if (source == null || !ctx.mounted) return;
+
     ref.read(cameraProvider.notifier).reset();
 
-    await ref.read(cameraProvider.notifier).pickImage();
-
-    if (ctx.mounted) {
-      final cameraState = ref.read(cameraProvider);
-
-      if (cameraState.state == CameraState.done) {
-        await openFormModal(
-          ctx,
-          Ticket(
-            id: '',
-            comercio: '',
-            fecha: DateTime.now(),
-            total: 0,
-            categoria: '',
-          ),
-        );
-      } else if (cameraState.state == CameraState.error) {
-        // TODO: Mostrar snackbar con error
-      } else {
-        // TODO: Mostrar snackbar con error
-      }
+    switch (source) {
+      case TicketSource.camera:
+        await ref.read(cameraProvider.notifier).pickImage();
+        break;
+      case TicketSource.gallery:
+        await ref.read(cameraProvider.notifier).pickFromGallery();
+        break;
+      case TicketSource.manual:
+        // No hay procesamiento, directo al form
+        break;
     }
+
+    if (!ctx.mounted) return;
+
+    final cameraState = ref.read(cameraProvider);
+
+    if (source != TicketSource.manual &&
+        cameraState.state == CameraState.error) {
+      // TODO: mostrar error
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TicketFormModal(
+        isManual: source == TicketSource.manual,
+        ticket: Ticket.empty(),
+      ),
+    );
   }
 
   void _openTicketDetail(BuildContext context, Ticket ticket) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      barrierColor: AppColors.black,
-      builder: (_) => TicketDetailScreen(ticket: ticket),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => TicketDetailScreen(ticket: ticket)),
     );
-  }
-}
-
-Future<T?> openFormModal<T>(BuildContext context, Ticket ticket) async {
-  try {
-    final result = await showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => TicketFormModal(ticket: ticket),
-    );
-
-    return result;
-  } catch (_) {
-    return null;
   }
 }

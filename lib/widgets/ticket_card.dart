@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:tickets_app/core/theme/app_colors.dart';
 import 'package:tickets_app/core/theme/app_theme.dart';
 import 'package:tickets_app/models/ticket.dart';
-import 'package:tickets_app/utils/category_icon_mapper.dart';
 
 class TicketCard extends StatelessWidget {
   final Ticket ticket;
@@ -18,10 +17,7 @@ class TicketCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: const BoxDecoration(
           border: Border(
-            bottom: BorderSide(
-              color: AppColors.gray200,
-              width: 0.5,
-            ),
+            bottom: BorderSide(color: AppColors.gray200, width: 0.5),
           ),
         ),
         child: Row(
@@ -34,11 +30,7 @@ class TicketCard extends StatelessWidget {
                 color: AppColors.gray100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                CategoryIconMapper.getIcon(ticket.categoria),
-                size: 24,
-                color: AppColors.gray600,
-              ),
+              child: Icon(ticket.icon, size: 24, color: AppColors.gray600),
             ),
             const SizedBox(width: 16),
             // Info del ticket
@@ -84,8 +76,18 @@ class TicketCard extends StatelessWidget {
 
   String _formatFecha(DateTime fecha) {
     final months = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
     ];
     return '${months[fecha.month - 1]} ${fecha.day} • ${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
   }

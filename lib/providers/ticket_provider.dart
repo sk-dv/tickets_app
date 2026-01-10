@@ -1,15 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:tickets_app/main.dart';
 import 'package:tickets_app/models/ticket.dart';
+import 'package:tickets_app/services/isar_service.dart';
 
 final ticketsProvider = AsyncNotifierProvider<TicketsNotifier, List<Ticket>>(
   () => TicketsNotifier(),
 );
 
 class TicketsNotifier extends AsyncNotifier<List<Ticket>> {
-  Future<String?> saveTicket({
+  final _isarService = IsarService();
+
+  Future<int?> saveTicket({
     required String comercio,
     required String fecha,
     required String hora,
@@ -20,69 +22,59 @@ class TicketsNotifier extends AsyncNotifier<List<Ticket>> {
   }) async {
     state = const AsyncValue.loading();
 
-    final response = await supabase.from('tickets').insert({
-      'comercio': comercio,
-      'fecha': fecha,
-      'hora': hora,
-      'total': total,
-      'direccion': direccion,
-      'categoría': categoria,
-      'productos': [],
-      'handmade': handmade,
-    }).select();
+    try {
+      final parsedFecha = DateTime.parse('${fecha}T$hora');
 
-    if (response.isNotEmpty) {
-      final newTicket = Ticket.fromJson(response.first);
-      state = AsyncData<List<Ticket>>([newTicket, ...state.value ?? []]);
-      return newTicket.id;
+      final ticket = Ticket(
+        comercio: comercio,
+        fecha: parsedFecha,
+        total: total,
+        categoria: categoria,
+        direccion: direccion,
+        productos: [],
+        handmade: handmade,
+        fechaProcesamiento: DateTime.now(),
+      );
+
+      final id = await _isarService.saveTicket(ticket);
+      final newTicket = await _isarService.getTicket(id);
+
+      if (newTicket != null) {
+        state = AsyncData<List<Ticket>>([newTicket, ...state.value ?? []]);
+        return id;
+      }
+
+      state = AsyncData<List<Ticket>>([]);
+      return null;
+    } catch (e) {
+      state = AsyncData<List<Ticket>>([]);
+      return null;
     }
-
-    state = AsyncData<List<Ticket>>([]);
-    return null;
-  }
-
-  Future<void> saveTrainingData({
-    required String comercio,
-    required String fotoPath,
-    required Map<String, dynamic> geminiOriginal,
-    required Map<String, dynamic> usuarioCorreccion,
-    required String categoriaFinal,
-    required bool handmade,
-    required double confianzaGemini,
-    String? ticketId,
-  }) async {
-    await supabase.from('training_data').insert({
-      'comercio': comercio,
-      'foto_path': fotoPath,
-      'gemini_original': geminiOriginal,
-      'usuario_correccion': usuarioCorreccion,
-      'categoria_final': categoriaFinal,
-      'handmade': handmade,
-      'confianza_gemini': confianzaGemini,
-      if (ticketId != null) 'ticket_id': ticketId,
-    });
   }
 
   void addTicket(Ticket ticket) {
     state = AsyncData<List<Ticket>>([ticket, ...state.value ?? []]);
   }
 
-  void updateTicket(String id, Ticket ticket) {
+  void updateTicket(int id, Ticket ticket) {
     state = AsyncData<List<Ticket>>([
       for (final t in state.value ?? [])
         if (t.id == id) ticket else t,
     ]);
   }
 
+  Future<void> deleteTicket(int id) async {
+    await _isarService.deleteTicket(id);
+    state = AsyncData<List<Ticket>>([
+      for (final t in state.value ?? [])
+        if (t.id != id) t,
+    ]);
+  }
+
   @override
   Future<List<Ticket>> build() async {
     try {
-      final tickets = await supabase
-          .from('tickets')
-          .select()
-          .order('fecha', ascending: false);
-
-      return tickets.map((ticket) => Ticket.fromJson(ticket)).toList();
+      return await _isarService.getAllTickets();
     } catch (e) {
       return [];
     }
