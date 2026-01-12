@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tickets_app/core/theme/app_colors.dart';
+import 'package:tickets_app/core/theme/app_theme.dart';
 import 'package:tickets_app/models/ticket.dart';
 import 'package:tickets_app/providers/camera_provider.dart';
 import 'package:tickets_app/providers/ticket_provider.dart';
@@ -22,22 +23,22 @@ extension ListTicketsExtension on List<Ticket> {
     final yesterday = today.subtract(const Duration(days: 1));
 
     final Map<String, List<Ticket>> grouped = {
-      'Hoy': [],
-      'Ayer': [],
-      'Este mes': [],
-      'Anteriores': [],
+      'HOY': [],
+      'AYER': [],
+      'ESTE MES': [],
+      'ANTERIORES': [],
     };
 
     for (final ticket in this) {
       if (ticket.fecha == today) {
-        grouped['Hoy']!.add(ticket);
+        grouped['HOY']!.add(ticket);
       } else if (ticket.fecha == yesterday) {
-        grouped['Ayer']!.add(ticket);
+        grouped['AYER']!.add(ticket);
       } else if (ticket.fecha.month == now.month &&
           ticket.fecha.year == now.year) {
-        grouped['Este mes']!.add(ticket);
+        grouped['ESTE MES']!.add(ticket);
       } else {
-        grouped['Anteriores']!.add(ticket);
+        grouped['ANTERIORES']!.add(ticket);
       }
     }
 
@@ -59,13 +60,12 @@ class HomeScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         elevation: 0,
         backgroundColor: AppColors.gray50,
-        leadingWidth: context.screenWidth * 0.25,
-        leading: Container(
+        title: Container(
           margin: const EdgeInsets.only(left: 16),
-          child: const Center(
+          child: Center(
             child: Text(
-              'tickets',
-              style: TextStyle(
+              'TICKETS',
+              style: AppTheme.mono.copyWith(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
                 color: AppColors.black,
@@ -87,8 +87,8 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 child: TextField(
                   decoration: InputDecoration(
-                    hintText: 'Buscar...',
-                    hintStyle: const TextStyle(
+                    hintText: 'BUSCAR...',
+                    hintStyle: AppTheme.mono.copyWith(
                       color: AppColors.gray400,
                       fontWeight: FontWeight.w400,
                     ),
@@ -118,17 +118,21 @@ class HomeScreen extends ConsumerWidget {
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
+                    horizontal: 8,
                     vertical: 8,
                   ),
                   children: sorted.entries.expand((entry) {
                     return [
                       // Header de sección
                       Padding(
-                        padding: const EdgeInsets.only(top: 16, bottom: 8),
+                        padding: const EdgeInsets.only(
+                          top: 16,
+                          bottom: 8,
+                          left: 16,
+                        ),
                         child: Text(
                           entry.key,
-                          style: const TextStyle(
+                          style: AppTheme.mono.copyWith(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.gray600,
@@ -214,6 +218,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   void _openTicketDetail(BuildContext context, Ticket ticket) {
+    print(ticket.toJson());
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TicketDetailScreen(ticket: ticket)),
     );

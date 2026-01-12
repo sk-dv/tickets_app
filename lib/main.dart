@@ -13,7 +13,6 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
 
   await IsarService().isar;
-
   runApp(const MyApp());
 }
 

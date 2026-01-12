@@ -3,11 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tickets_app/core/theme/app_colors.dart';
 import 'package:tickets_app/core/theme/app_theme.dart';
 import 'package:tickets_app/models/ticket.dart';
+import 'package:tickets_app/models/gemini_response.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:tickets_app/widgets/date_time_button.dart';
+import 'package:tickets_app/widgets/icon_picker.dart';
 import 'package:tickets_app/widgets/shadowned_action_button.dart';
 import 'package:tickets_app/widgets/shadowned_button.dart';
 import 'package:tickets_app/widgets/time_wrapper.dart';
+import 'package:tickets_app/utils/confidence_calculator.dart';
+import 'package:tickets_app/widgets/confidence_breakdown.dart';
+import 'package:tickets_app/widgets/field_confidence_indicator.dart';
+import 'package:intl/intl.dart';
 
 class TicketDetailScreen extends ConsumerStatefulWidget {
   final Ticket ticket;
@@ -19,39 +25,93 @@ class TicketDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
-  double? _confianza;
-  bool _loading = true;
+  ConfidenceResult? _confidenceResult;
+  late final GeminiResponse _originalValues;
 
   late final TextEditingController _montoController;
   late final TextEditingController _comercioController;
   late final TextEditingController _categoriaController;
   late DateTime _selectedDateTime;
   late IconData _selectedIcon;
+  late String _selectedCategoria;
 
   @override
   void initState() {
     super.initState();
     _selectedDateTime = widget.ticket.fecha;
     _selectedIcon = widget.ticket.icon;
+    _selectedCategoria = widget.ticket.categoria;
+
     _montoController = TextEditingController(
       text: widget.ticket.total.toStringAsFixed(2),
     );
     _comercioController = TextEditingController(text: widget.ticket.comercio);
     _categoriaController = TextEditingController(text: widget.ticket.categoria);
-    _loadConfianza();
+
+    // Guardar valores originales como referencia
+    _originalValues = GeminiResponse(
+      comercio: widget.ticket.comercio,
+      fecha: DateFormat('yyyy-MM-dd').format(widget.ticket.fecha),
+      hora: DateFormat('HH:mm:ss').format(widget.ticket.fecha),
+      total: widget.ticket.total,
+      direccion: widget.ticket.direccion ?? '',
+      productos: [],
+      categoria: widget.ticket.categoria,
+    );
+
+    _montoController.addListener(_recalculateConfidence);
+    _comercioController.addListener(_recalculateConfidence);
+
+    _recalculateConfidence();
   }
 
   @override
   void dispose() {
+    _montoController.removeListener(_recalculateConfidence);
+    _comercioController.removeListener(_recalculateConfidence);
     _montoController.dispose();
     _comercioController.dispose();
     _categoriaController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadConfianza() async {
-    // TODO: Implementar carga de confianza desde Isar si se necesita
-    setState(() => _loading = false);
+  void _onIconChanged(IconData icon, String categoria) {
+    setState(() {
+      _selectedIcon = icon;
+      _selectedCategoria = categoria;
+      _categoriaController.text = categoria;
+    });
+    _recalculateConfidence();
+  }
+
+  void _recalculateConfidence() {
+    final parsedTotal = double.tryParse(
+      _montoController.text.replaceAll(',', '.'),
+    ) ?? 0.0;
+
+    final currentValues = GeminiResponse(
+      comercio: _comercioController.text.trim(),
+      fecha: DateFormat('yyyy-MM-dd').format(_selectedDateTime),
+      hora: DateFormat('HH:mm:ss').format(_selectedDateTime),
+      total: parsedTotal,
+      direccion: _originalValues.direccion,
+      productos: [],
+      categoria: _selectedCategoria,
+    );
+
+    setState(() {
+      _confidenceResult = ConfidenceCalculator.calculateDetailed(
+        gemini: _originalValues,
+        usuario: currentValues,
+      );
+    });
+  }
+
+  FieldScore? _getFieldScore(String fieldName) {
+    if (_confidenceResult == null) return null;
+    return _confidenceResult!.fields.firstWhere(
+      (field) => field.fieldName == fieldName,
+    );
   }
 
   void _saveForm() {
@@ -115,7 +175,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
               seconds: newDateTime.second,
             );
           },
-         selectionOverlayBuilder: overlay,
+          selectionOverlayBuilder: overlay,
         ),
       );
     }
@@ -131,7 +191,8 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           pickedTime!.inSeconds.remainder(60),
         );
       });
-    } else {
+      _recalculateConfidence();
+    } else if (pickedDate != null) {
       setState(() {
         _selectedDateTime = DateTime(
           pickedDate!.year,
@@ -142,102 +203,8 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           _selectedDateTime.second,
         );
       });
+      _recalculateConfidence();
     }
-  }
-
-  Future<void> _showIconPicker() async {
-    final icons = [
-      Icons.shopping_cart,
-      Icons.restaurant,
-      Icons.local_gas_station,
-      Icons.medical_services,
-      Icons.school,
-      Icons.home,
-      Icons.flight,
-      Icons.hotel,
-      Icons.local_movies,
-      Icons.fitness_center,
-      Icons.pets,
-      Icons.toys,
-      Icons.local_grocery_store,
-      Icons.local_pharmacy,
-      Icons.spa,
-      Icons.sports_soccer,
-      Icons.music_note,
-      Icons.book,
-      Icons.coffee,
-      Icons.fastfood,
-    ];
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Seleccionar ícono',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.black,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: icons.length,
-                  itemBuilder: (context, index) {
-                    final icon = icons[index];
-                    final isSelected = icon == _selectedIcon;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedIcon = icon;
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primaryPastel
-                              : AppColors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.gray300,
-                              blurRadius: 2,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          icon,
-                          size: 28,
-                          color: isSelected ? AppColors.white : AppColors.black,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   @override
@@ -276,162 +243,126 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: _showIconPicker,
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.black, width: 0.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.black,
-                        blurRadius: 0,
-                        spreadRadius: 1,
-                        offset: const Offset(1.5, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(_selectedIcon, size: 25, color: AppColors.black),
-                ),
+              IconPicker(
+                initialIcon: _selectedIcon,
+                onIconChanged: _onIconChanged,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _montoController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                style: AppTheme.mono.copyWith(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.black,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Total',
-                  labelStyle: TextStyle(color: AppColors.gray600, fontSize: 13),
-                  prefixText: '\$',
-                  border: InputBorder.none,
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Ingrese el total';
-                  final parsed = double.tryParse(v.replaceAll(',', '.'));
-                  if (parsed == null) return 'Total inválido';
-                  if (parsed < 0) return 'El total no puede ser negativo';
-                  return null;
-                },
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _montoController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: AppTheme.mono.copyWith(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Total',
+                      labelStyle: TextStyle(color: AppColors.gray600, fontSize: 13),
+                      prefixText: '\$',
+                      border: InputBorder.none,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Ingrese el total';
+                      final parsed = double.tryParse(v.replaceAll(',', '.'));
+                      if (parsed == null) return 'Total inválido';
+                      if (parsed < 0) return 'El total no puede ser negativo';
+                      return null;
+                    },
+                  ),
+                  if (_getFieldScore('Total') != null)
+                    FieldConfidenceIndicator(
+                      score: _getFieldScore('Total')!.score,
+                      isModified: _getFieldScore('Total')!.wasModified,
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
-              DateTimeButton(
-                dateTime: _selectedDateTime,
-                onTap: _showDateTimePicker,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DateTimeButton(
+                    dateTime: _selectedDateTime,
+                    onTap: _showDateTimePicker,
+                  ),
+                  if (_getFieldScore('Fecha') != null)
+                    FieldConfidenceIndicator(
+                      score: (_getFieldScore('Fecha')!.score + _getFieldScore('Hora')!.score) / 2,
+                      isModified: _getFieldScore('Fecha')!.wasModified || _getFieldScore('Hora')!.wasModified,
+                    ),
+                ],
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _comercioController,
-                decoration: const InputDecoration(
-                  labelText: 'Comercio',
-                  labelStyle: TextStyle(fontSize: 13, color: AppColors.gray600),
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.black,
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingrese el comercio'
-                    : null,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _comercioController,
+                    decoration: const InputDecoration(
+                      labelText: 'Comercio',
+                      labelStyle: TextStyle(fontSize: 13, color: AppColors.gray600),
+                      border: InputBorder.none,
+                    ),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black,
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Ingrese el comercio'
+                        : null,
+                  ),
+                  if (_getFieldScore('Comercio') != null)
+                    FieldConfidenceIndicator(
+                      score: _getFieldScore('Comercio')!.score,
+                      isModified: _getFieldScore('Comercio')!.wasModified,
+                    ),
+                ],
               ),
 
               const SizedBox(height: 4),
 
-              TextFormField(
-                controller: _categoriaController,
-                decoration: const InputDecoration(
-                  labelText: 'Categoría',
-                  labelStyle: TextStyle(fontSize: 13, color: AppColors.gray600),
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(fontSize: 16, color: AppColors.black),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingrese la categoría'
-                    : null,
-              ),
-              const SizedBox(height: 32),
-              if (_loading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(
-                      color: AppColors.primaryPastel,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _categoriaController,
+                    enabled: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoría',
+                      labelStyle: TextStyle(fontSize: 13, color: AppColors.gray600),
+                      border: InputBorder.none,
                     ),
+                    style: const TextStyle(fontSize: 16, color: AppColors.gray600),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Seleccione un ícono'
+                        : null,
                   ),
-                )
-              else if (_confianza != null) ...[
+                  if (_getFieldScore('Categoría') != null)
+                    FieldConfidenceIndicator(
+                      score: _getFieldScore('Categoría')!.score,
+                      isModified: _getFieldScore('Categoría')!.wasModified,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              if (_confidenceResult != null) ...[
                 const Text(
-                  'Precisión del modelo',
+                  'CONFIABILIDAD DE DATOS',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.gray600,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: _getConfianzaColor(_confianza!),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${_confianza!.toStringAsFixed(0)}%',
-                            style: AppTheme.mono.copyWith(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getConfianzaLabel(_confianza!),
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _getConfianzaDescription(_confianza!),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.gray600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ConfidenceBreakdown(result: _confidenceResult!),
               ],
 
               const Spacer(),
@@ -445,23 +376,5 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
         ),
       ),
     );
-  }
-
-  Color _getConfianzaColor(double confianza) {
-    if (confianza >= 80) return Colors.green;
-    if (confianza >= 60) return Colors.orange;
-    return Colors.red;
-  }
-
-  String _getConfianzaLabel(double confianza) {
-    if (confianza >= 80) return 'Alta precisión';
-    if (confianza >= 60) return 'Precisión media';
-    return 'Baja precisión';
-  }
-
-  String _getConfianzaDescription(double confianza) {
-    if (confianza >= 80) return 'Pocos campos modificados';
-    if (confianza >= 60) return 'Algunos campos modificados';
-    return 'Muchos campos modificados';
   }
 }

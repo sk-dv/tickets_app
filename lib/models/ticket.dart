@@ -10,11 +10,7 @@ class Product {
   late int cantidad;
   late double precio;
 
-  Product({
-    this.nombre = '',
-    this.cantidad = 0,
-    this.precio = 0.0,
-  });
+  Product({this.nombre = '', this.cantidad = 0, this.precio = 0.0});
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -25,10 +21,10 @@ class Product {
   }
 
   Map<String, dynamic> toJson() => {
-        'nombre': nombre,
-        'cantidad': cantidad,
-        'precio': precio,
-      };
+    'nombre': nombre,
+    'cantidad': cantidad,
+    'precio': precio,
+  };
 }
 
 @collection
@@ -68,11 +64,15 @@ class Ticket {
 
   @ignore
   IconData get icon {
-    final category = Categories.all.cast<Category>().firstWhere(
-      (c) => c.nombre.toLowerCase() == categoria.toLowerCase(),
-      orElse: () => Categories.all.last,
-    );
-    return category.icono;
+    for (Category category in Categories.all) {
+      for (String keyword in category.keywords) {
+        if (keyword.toLowerCase() == categoria.toLowerCase()) {
+          return category.icono;
+        }
+      }
+    }
+
+    return Categories.all.last.icono;
   }
 
   @ignore
@@ -116,4 +116,16 @@ class Ticket {
       handmade: false,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'comercio': comercio,
+    'fecha': fecha.toIso8601String(),
+    'total': total,
+    'categoria': categoria,
+    'productos': productos.map((p) => p.toJson()).toList(),
+    'direccion': direccion,
+    'tiempo_extraccion': tiempoExtraccion,
+    'fecha_procesamiento': fechaProcesamiento?.toIso8601String(),
+    'handmade': handmade,
+  };
 }

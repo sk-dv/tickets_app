@@ -1,6 +1,34 @@
 import 'dart:math';
 import 'package:tickets_app/models/gemini_response.dart';
 
+class FieldScore {
+  final String fieldName;
+  final double score;
+  final String original;
+  final String current;
+
+  const FieldScore({
+    required this.fieldName,
+    required this.score,
+    required this.original,
+    required this.current,
+  });
+
+  bool get wasModified => score < 0.99;
+}
+
+class ConfidenceResult {
+  final double overall;
+  final List<FieldScore> fields;
+
+  const ConfidenceResult({
+    required this.overall,
+    required this.fields,
+  });
+
+  int get modifiedFieldsCount => fields.where((f) => f.wasModified).length;
+}
+
 class ConfidenceCalculator {
   static double calculate({
     required GeminiResponse gemini,
@@ -17,6 +45,49 @@ class ConfidenceCalculator {
 
     final avg = scores.reduce((a, b) => a + b) / scores.length;
     return (avg * 100).clamp(0, 100);
+  }
+
+  static ConfidenceResult calculateDetailed({
+    required GeminiResponse gemini,
+    required GeminiResponse usuario,
+  }) {
+    final fields = <FieldScore>[
+      FieldScore(
+        fieldName: 'Comercio',
+        score: gemini.comercio.compareString(usuario.comercio),
+        original: gemini.comercio,
+        current: usuario.comercio,
+      ),
+      FieldScore(
+        fieldName: 'Fecha',
+        score: gemini.fecha.compareString(usuario.fecha),
+        original: gemini.fecha,
+        current: usuario.fecha,
+      ),
+      FieldScore(
+        fieldName: 'Hora',
+        score: gemini.hora.compareString(usuario.hora),
+        original: gemini.hora,
+        current: usuario.hora,
+      ),
+      FieldScore(
+        fieldName: 'Total',
+        score: gemini.total.compareNumber(usuario.total),
+        original: '\$${gemini.total.toStringAsFixed(2)}',
+        current: '\$${usuario.total.toStringAsFixed(2)}',
+      ),
+      FieldScore(
+        fieldName: 'Categoría',
+        score: gemini.categoria?.compareString(usuario.categoria ?? '') ?? 1.0,
+        original: gemini.categoria ?? '',
+        current: usuario.categoria ?? '',
+      ),
+    ];
+
+    final avg = fields.map((f) => f.score).reduce((a, b) => a + b) / fields.length.toDouble();
+    final overall = (avg * 100).clamp(0.0, 100.0).toDouble();
+
+    return ConfidenceResult(overall: overall, fields: fields);
   }
 }
 

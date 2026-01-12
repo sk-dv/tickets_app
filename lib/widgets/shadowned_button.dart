@@ -8,11 +8,13 @@ class ShadownedButton extends StatefulWidget {
     required this.child,
     required this.onPressed,
     this.scales = const (1.0, 1.2),
+    this.shadowned = false,
   });
 
   final Widget child;
   final VoidCallback onPressed;
   final (double, double) scales;
+  final bool shadowned;
 
   @override
   State<ShadownedButton> createState() => _ShadownedButtonState();
@@ -67,7 +69,7 @@ class _ShadownedButtonState extends State<ShadownedButton>
           padding: const EdgeInsets.all(8),
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.white,
+            color: widget.shadowned ? AppColors.black : AppColors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.black, width: 0.5),
             boxShadow: [

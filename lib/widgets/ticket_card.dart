@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tickets_app/core/theme/app_colors.dart';
 import 'package:tickets_app/core/theme/app_theme.dart';
 import 'package:tickets_app/models/ticket.dart';
+import 'package:tickets_app/widgets/shadowned_button.dart';
 
 class TicketCard extends StatelessWidget {
   final Ticket ticket;
@@ -11,26 +12,22 @@ class TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
+    return ShadownedButton(
+      scales: (1.0, 0.98),
+      onPressed: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.gray200, width: 0.5),
-          ),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
             // Ícono circular
             Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: AppColors.gray100,
+                color: AppColors.black,
                 shape: BoxShape.circle,
               ),
-              child: Icon(ticket.icon, size: 24, color: AppColors.gray600),
+              child: Icon(ticket.icon, size: 20, color: AppColors.white),
             ),
             const SizedBox(width: 16),
             // Info del ticket
